@@ -29,6 +29,7 @@ Derived from `python3 discover_org_id.py` (Webex People `/me` orgId).
 | `get_user_by_id.py` | `GET /organization/{orgId}/user/{id}` |
 | `get_team_by_id.py` | `GET /organization/{orgId}/team/{id}` |
 | `update_user_skill_profile.py` | Dry-run (default) or `--apply` PUT user skillProfileId |
+| `create_dynamic_skill.py` | Create dynamic skill definition(s); `--seed` for demo set; `--retire-legacy` to deactivate old seeds |
 
 ## Example
 

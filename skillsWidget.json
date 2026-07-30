@@ -100,7 +100,7 @@
               "comp": "div",
               "style": {
                 "height": "100%",
-                "overflow": "scroll"
+                "overflow": "auto"
               },
               "children": [
                 {

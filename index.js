@@ -84,10 +84,25 @@ app.get("/health", (_req, res) => {
   });
 });
 
+const skillsListPath = () => `/organization/${orgId}/skill?pageSize=500`;
+
 app.get("/api/skills", async (_req, res) => {
   if (!requireOrg(res)) return;
-  const result = await wxccRequest("GET", `/organization/${orgId}/skill`);
+  const result = await wxccRequest("GET", skillsListPath());
   res.status(result.status).json(result.body);
+});
+
+app.get("/api/skills/dynamic", async (_req, res) => {
+  if (!requireOrg(res)) return;
+  const result = await wxccRequest("GET", skillsListPath());
+  if (result.status !== 200 || !Array.isArray(result.body)) {
+    res.status(result.status).json(result.body);
+    return;
+  }
+  const skills = result.body.filter(
+    (s) => s.dynamicSkill && s.active && !s.systemDefault
+  );
+  res.json(skills);
 });
 
 app.get("/api/skill-profiles", async (_req, res) => {
@@ -124,12 +139,24 @@ app.get("/api/users/:id", async (req, res) => {
   res.status(result.status).json(result.body);
 });
 
-function sanitizeUserPayload(user, skillProfileId) {
+function sanitizeUserPayload(user) {
   const payload = { ...user };
   delete payload._links;
   delete payload.links;
-  payload.skillProfileId = skillProfileId;
   return payload;
+}
+
+async function verifySelfUser(userId, email, res) {
+  const current = await wxccRequest("GET", `/organization/${orgId}/user/${userId}`);
+  if (current.status !== 200) {
+    res.status(current.status).json(current.body);
+    return null;
+  }
+  if ((current.body.email || "").toLowerCase() !== email.toLowerCase()) {
+    res.status(403).json({ error: "You may only update your own user record." });
+    return null;
+  }
+  return current.body;
 }
 
 app.put("/api/users/:id/skill-profile", async (req, res) => {
@@ -144,16 +171,8 @@ app.put("/api/users/:id/skill-profile", async (req, res) => {
     return;
   }
 
-  const current = await wxccRequest("GET", `/organization/${orgId}/user/${req.params.id}`);
-  if (current.status !== 200) {
-    res.status(current.status).json(current.body);
-    return;
-  }
-
-  if ((current.body.email || "").toLowerCase() !== email.toLowerCase()) {
-    res.status(403).json({ error: "You may only update your own skill profile." });
-    return;
-  }
+  const current = await verifySelfUser(req.params.id, email, res);
+  if (!current) return;
 
   const profileCheck = await wxccRequest(
     "GET",
@@ -164,7 +183,61 @@ app.put("/api/users/:id/skill-profile", async (req, res) => {
     return;
   }
 
-  const payload = sanitizeUserPayload(current.body, skillProfileId);
+  const payload = sanitizeUserPayload(current);
+  payload.skillProfileId = skillProfileId;
+  const result = await wxccRequest("PUT", `/organization/${orgId}/user/${req.params.id}`, payload);
+  res.status(result.status).json(result.body);
+});
+
+app.put("/api/users/:id/dynamic-skills", async (req, res) => {
+  if (!requireOrg(res)) return;
+  const { dynamicSkills, email } = req.body || {};
+  if (!email) {
+    res.status(400).json({ error: "email is required to verify agent identity." });
+    return;
+  }
+  if (!Array.isArray(dynamicSkills)) {
+    res.status(400).json({ error: "dynamicSkills must be an array." });
+    return;
+  }
+
+  const current = await verifySelfUser(req.params.id, email, res);
+  if (!current) return;
+
+  const skillsResult = await wxccRequest("GET", skillsListPath());
+  if (skillsResult.status !== 200 || !Array.isArray(skillsResult.body)) {
+    res.status(skillsResult.status).json(skillsResult.body);
+    return;
+  }
+
+  const dynamicById = Object.fromEntries(
+    skillsResult.body
+      .filter((s) => s.dynamicSkill && s.active && !s.systemDefault)
+      .map((s) => [s.id, s])
+  );
+
+  for (const entry of dynamicSkills) {
+    if (!entry.skillId || !dynamicById[entry.skillId]) {
+      res.status(400).json({ error: `Invalid or non-assignable dynamic skillId: ${entry.skillId}` });
+      return;
+    }
+    const def = dynamicById[entry.skillId];
+    if (def.skillType === "PROFICIENCY" && entry.proficiencyValue === undefined) {
+      res.status(400).json({ error: `proficiencyValue required for ${def.name}.` });
+      return;
+    }
+    if (def.skillType === "TEXT" && !entry.textValue) {
+      res.status(400).json({ error: `textValue required for ${def.name}.` });
+      return;
+    }
+    if (def.skillType === "BOOLEAN" && entry.booleanValue === undefined) {
+      res.status(400).json({ error: `booleanValue required for ${def.name}.` });
+      return;
+    }
+  }
+
+  const payload = sanitizeUserPayload(current);
+  payload.dynamicSkills = dynamicSkills;
   const result = await wxccRequest("PUT", `/organization/${orgId}/user/${req.params.id}`, payload);
   res.status(result.status).json(result.body);
 });
