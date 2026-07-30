@@ -17,8 +17,6 @@ Agents select from pre-configured skill profiles. The widget updates only the lo
 
 The widget can be hosted locally for testing on the same machine as the agent desktop. However, you will want to deploy this to a webserver with an SSL certificate when going live.
 
-To understand how to interact with our Desktop Layout, please watch the video and supplemental detailed documentation @ **[Desktop Layout - Administration Guide](https://www.cisco.com/c/en/us/td/docs/voice_ip_comm/cust_contact/contact_center/webexcc/SetupandAdministrationGuide_2/b_mp-release-2/b_cc-release-2_chapter_011.html#topic_8230815F4023699032326F948C3F1495)**
-
 ## Installation
 
 ### 1. Setting up the Webex Service App
@@ -26,8 +24,6 @@ To understand how to interact with our Desktop Layout, please watch the video an
 This widget uses a **Service App** on the backend to perform configuration writes. The Agent Desktop token available to widgets is read-only (`cjp:config_read`) and cannot update skill assignments directly.
 
 * a. [Create a new Webex Service App](https://developer.webex.com/create/docs/service-apps)
-  * i. Use a dedicated service account (for example `skills-widget@yourorg.com`) with appropriate Contact Center admin permissions.
-  * ii. You can give it any name ("Contact Center Skills Widget") and any 512x512 icon.
 * b. Complete the Service App authorization flow and obtain a **refresh token**.
 * c. The scopes selected must include at minimum:
   * ```cjp:config_read```
